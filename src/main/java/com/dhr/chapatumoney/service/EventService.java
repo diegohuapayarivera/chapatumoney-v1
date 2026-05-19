@@ -43,10 +43,17 @@ public class EventService {
                                                              String fechaDesde, String fechaHasta,
                                                              String q, int page, int size) {
         OffsetDateTime from = parseDate(fechaDesde, false);
+        if (from == null) from = OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+
         OffsetDateTime to = parseDate(fechaHasta, true);
+        if (to == null) to = OffsetDateTime.of(2100, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+
+        String safeCiudad = (ciudad == null) ? "" : ciudad;
+        String safeGenero = (genero == null) ? "" : genero;
+        String safeQ = (q == null) ? "" : q;
 
         Page<Event> events = eventRepository.searchPublishedEvents(
-                ciudad, genero, from, to, q, PageRequest.of(page, size));
+                safeCiudad, safeGenero, from, to, safeQ, PageRequest.of(page, size));
 
         return PagedResponse.from(events, e -> toSummaryResponse(e, null));
     }

@@ -43,16 +43,29 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/organizers/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/organizers/{id}/events").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/users/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                 // Todo lo demás requiere JWT válido
                 .anyRequest().authenticated()
             )
-            // Validación JWT vía JWKS — soporta ECC P-256 y HS256 automáticamente
-            // JWKS URI configurado en application.properties
+            // Validación JWT vía llave secreta simétrica (HS256) usada por Supabase Auth
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .jwt(jwt -> jwt
+                    .decoder(jwtDecoder())
+                    .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                )
             );
 
         return http.build();
+    }
+
+    @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}")
+    private String jwkSetUri;
+
+    @Bean
+    public org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder() {
+        return org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+                .jwsAlgorithm(org.springframework.security.oauth2.jose.jws.SignatureAlgorithm.ES256)
+                .build();
     }
 
     /**
@@ -76,8 +89,8 @@ public class SecurityConfig {
 
         List<String> origins = Arrays.asList(allowedOriginsProperty.split(","));
         config.setAllowedOriginPatterns(origins);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowedMethods(List.of("*"));
+        config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
 

@@ -20,8 +20,8 @@ public interface ArtistRepository extends JpaRepository<Artist, UUID> {
 
     @Query("""
         SELECT a FROM Artist a
-        WHERE (:q IS NULL OR LOWER(a.nombre) LIKE LOWER(CONCAT('%', :q, '%')))
-          AND (:genero IS NULL OR LOWER(a.genero) LIKE LOWER(CONCAT('%', :genero, '%')))
+        WHERE (:q = '' OR LOWER(a.nombre) LIKE LOWER(CONCAT('%', :q, '%')))
+          AND (:genero = '' OR LOWER(a.genero) LIKE LOWER(CONCAT('%', :genero, '%')))
         """)
     Page<Artist> searchArtists(
             @Param("q") String q,

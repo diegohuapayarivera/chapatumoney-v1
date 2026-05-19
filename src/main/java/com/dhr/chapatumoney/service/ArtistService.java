@@ -75,7 +75,9 @@ public class ArtistService {
     @Transactional(readOnly = true)
     public PagedResponse<ArtistResponse> searchArtists(String q, String genero, int page, int size,
                                                         String authenticatedUserId) {
-        Page<Artist> artistPage = artistRepository.searchArtists(q, genero, PageRequest.of(page, size));
+        String safeQ = (q == null) ? "" : q;
+        String safeGenero = (genero == null) ? "" : genero;
+        Page<Artist> artistPage = artistRepository.searchArtists(safeQ, safeGenero, PageRequest.of(page, size));
         return PagedResponse.from(artistPage, a -> toResponse(a, authenticatedUserId));
     }
 

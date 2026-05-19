@@ -20,11 +20,11 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
         LEFT JOIN e.eventArtists ea
         LEFT JOIN ea.artist a
         WHERE e.estado = 'published'
-          AND (:ciudad IS NULL OR LOWER(e.ciudad) = LOWER(:ciudad))
-          AND (:genero IS NULL OR LOWER(a.genero) LIKE LOWER(CONCAT('%', :genero, '%')))
-          AND (:fechaDesde IS NULL OR e.fechaInicio >= :fechaDesde)
-          AND (:fechaHasta IS NULL OR e.fechaInicio <= :fechaHasta)
-          AND (:q IS NULL OR LOWER(e.nombre) LIKE LOWER(CONCAT('%', :q, '%'))
+          AND (:ciudad = '' OR LOWER(e.ciudad) = LOWER(:ciudad))
+          AND (:genero = '' OR LOWER(a.genero) LIKE LOWER(CONCAT('%', :genero, '%')))
+          AND (e.fechaInicio >= :fechaDesde)
+          AND (e.fechaInicio <= :fechaHasta)
+          AND (:q = '' OR LOWER(e.nombre) LIKE LOWER(CONCAT('%', :q, '%'))
                           OR LOWER(a.nombre) LIKE LOWER(CONCAT('%', :q, '%')))
         """)
     Page<Event> searchPublishedEvents(
