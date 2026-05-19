@@ -1,0 +1,1616 @@
+openapi: 3.0.3
+
+info:
+  title: StagePass API
+  description: |
+    API REST para la plataforma StagePass — conexión entre fans, artistas y organizadores de eventos.
+
+    ## Autenticación
+    Todos los endpoints protegidos requieren un JWT emitido por **Supabase Auth**.
+    El frontend obtiene el token al hacer login (email/password o Google OAuth) y lo envía en cada request:
+    ```
+    Authorization: Bearer <supabase_jwt>
+    ```
+    Spring Boot valida el token localmente usando la clave pública de Supabase (JWKS).
+    El `sub` del JWT corresponde al `user_id` en `public.users`.
+
+    ## Roles
+    - **USER**: cualquier usuario autenticado.
+    - **ORGANIZER**: usuario que además tiene un registro en `public.organizers`.
+    - **ARTIST**: usuario que además tiene un registro en `public.artists` con `user_id` vinculado.
+
+    Los endpoints públicos (sin candado) no requieren token.
+
+  version: 1.0.0
+  contact:
+    name: StagePass — Universidad
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080/api
+    description: Desarrollo local (Spring Boot)
+  - url: https://api.stagepass.mx/api
+    description: Producción (referencia futura)
+
+tags:
+  - name: Auth
+    description: Validación de sesión y perfil propio
+  - name: Users
+    description: Perfil público de usuarios
+  - name: Organizers
+    description: Perfil y gestión de organizadores
+  - name: Artists
+    description: Perfil y listado de artistas
+  - name: Events
+    description: Catálogo y gestión de eventos
+  - name: TicketTypes
+    description: Tipos de boleto por evento
+  - name: Orders
+    description: Órdenes de compra
+  - name: Tickets
+    description: Boletos individuales del usuario
+  - name: Following
+    description: Seguimiento de artistas
+
+# ==============================================================================
+# SECURITY SCHEME
+# ==============================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Supabase Auth.
+
+  # ============================================================================
+  # SCHEMAS (DTOs)
+  # ============================================================================
+  schemas:
+
+    # --------------------------------------------------------------------------
+    # ERRORS
+    # --------------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-07-26T16:00:00Z"
+        status:
+          type: integer
+          example: 404
+        error:
+          type: string
+          example: "Not Found"
+        message:
+          type: string
+          example: "Evento no encontrado con id: abc-123"
+        path:
+          type: string
+          example: "/api/events/abc-123"
+      required: [timestamp, status, error, message, path]
+
+    # --------------------------------------------------------------------------
+    # AUTH
+    # --------------------------------------------------------------------------
+    AuthProfileResponse:
+      type: object
+      description: Perfil completo del usuario autenticado, incluyendo sus roles activos.
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nombre:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        is_organizer:
+          type: boolean
+          description: TRUE si tiene registro en public.organizers
+        is_artist:
+          type: boolean
+          description: TRUE si tiene registro en public.artists con user_id
+        organizer_id:
+          type: string
+          format: uuid
+          nullable: true
+        artist_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, email, nombre, is_organizer, is_artist, created_at]
+
+    # --------------------------------------------------------------------------
+    # USERS
+    # --------------------------------------------------------------------------
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Laura Mendoza"
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, nombre, created_at]
+
+    UpdateUserRequest:
+      type: object
+      description: Solo se pueden actualizar nombre y avatar. El email lo gestiona Supabase Auth.
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 150
+          example: "Laura Mendoza"
+        avatar_url:
+          type: string
+          nullable: true
+          example: "https://storage.supabase.co/avatars/abc.jpg"
+
+    # --------------------------------------------------------------------------
+    # ORGANIZERS
+    # --------------------------------------------------------------------------
+    OrganizerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Producción Sónica MX"
+        descripcion:
+          type: string
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, user_id, nombre, created_at]
+
+    CreateOrganizerRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 200
+          example: "Producción Sónica MX"
+        descripcion:
+          type: string
+          nullable: true
+          example: "Productora especializada en festivales de música electrónica."
+        logo_url:
+          type: string
+          nullable: true
+      required: [nombre]
+
+    UpdateOrganizerRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 200
+        descripcion:
+          type: string
+          nullable: true
+        logo_url:
+          type: string
+          nullable: true
+
+    # --------------------------------------------------------------------------
+    # ARTISTS
+    # --------------------------------------------------------------------------
+    ArtistResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Mara Kane"
+        genero:
+          type: string
+          example: "Techno / Deep House"
+        bio:
+          type: string
+          nullable: true
+        foto_url:
+          type: string
+          nullable: true
+        followers_count:
+          type: integer
+          description: Cantidad de usuarios que siguen a este artista
+          example: 342
+        is_following:
+          type: boolean
+          description: TRUE si el usuario autenticado sigue a este artista. NULL si no hay sesión.
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required: [id, nombre, genero, followers_count, created_at]
+
+    CreateArtistRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 200
+          example: "Mara Kane"
+        genero:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "Techno / Deep House"
+        bio:
+          type: string
+          nullable: true
+        foto_url:
+          type: string
+          nullable: true
+      required: [nombre, genero]
+
+    UpdateArtistRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 200
+        genero:
+          type: string
+          minLength: 2
+          maxLength: 100
+        bio:
+          type: string
+          nullable: true
+        foto_url:
+          type: string
+          nullable: true
+
+    # --------------------------------------------------------------------------
+    # EVENTS
+    # --------------------------------------------------------------------------
+    EventSummaryResponse:
+      type: object
+      description: Vista resumida para listados y tarjetas.
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Festival Sónico — Edición Verano 2025"
+        lugar:
+          type: string
+          example: "Parque Metropolitano"
+        ciudad:
+          type: string
+          example: "Ciudad de México"
+        fecha_inicio:
+          type: string
+          format: date-time
+        imagen_url:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          enum: [draft, published, cancelled]
+        organizer:
+          $ref: '#/components/schemas/OrganizerResponse'
+        artists:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtistResponse'
+        precio_desde:
+          type: number
+          format: double
+          description: Precio mínimo entre todos los ticket_types activos
+          example: 850.00
+        boletos_disponibles:
+          type: integer
+          description: Total de boletos disponibles sumando todos los ticket_types
+          example: 380
+      required: [id, nombre, lugar, ciudad, fecha_inicio, estado, organizer, artists]
+
+    EventDetailResponse:
+      type: object
+      description: Vista completa del evento con todos sus ticket_types.
+      allOf:
+        - $ref: '#/components/schemas/EventSummaryResponse'
+        - type: object
+          properties:
+            descripcion:
+              type: string
+              nullable: true
+            fecha_fin:
+              type: string
+              format: date-time
+              nullable: true
+            ticket_types:
+              type: array
+              items:
+                $ref: '#/components/schemas/TicketTypeResponse'
+            created_at:
+              type: string
+              format: date-time
+          required: [ticket_types, created_at]
+
+    CreateEventRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 300
+          example: "Festival Sónico — Edición Verano 2025"
+        descripcion:
+          type: string
+          nullable: true
+        lugar:
+          type: string
+          minLength: 2
+          maxLength: 300
+          example: "Parque Metropolitano"
+        ciudad:
+          type: string
+          minLength: 2
+          maxLength: 150
+          example: "Ciudad de México"
+        fecha_inicio:
+          type: string
+          format: date-time
+          example: "2025-07-26T16:00:00Z"
+        fecha_fin:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2025-07-27T02:00:00Z"
+        imagen_url:
+          type: string
+          nullable: true
+      required: [nombre, lugar, ciudad, fecha_inicio]
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 300
+        descripcion:
+          type: string
+          nullable: true
+        lugar:
+          type: string
+        ciudad:
+          type: string
+        fecha_inicio:
+          type: string
+          format: date-time
+        fecha_fin:
+          type: string
+          format: date-time
+          nullable: true
+        imagen_url:
+          type: string
+          nullable: true
+
+    PublishEventRequest:
+      type: object
+      description: Cambia el estado del evento a published. Solo válido desde draft.
+      properties:
+        confirmar:
+          type: boolean
+          description: Debe ser true para confirmar la publicación.
+          example: true
+      required: [confirmar]
+
+    AddArtistToEventRequest:
+      type: object
+      properties:
+        artist_id:
+          type: string
+          format: uuid
+        orden:
+          type: integer
+          nullable: true
+          description: Posición en el cartel. 1 = headliner.
+          example: 1
+      required: [artist_id]
+
+    # --------------------------------------------------------------------------
+    # TICKET TYPES
+    # --------------------------------------------------------------------------
+    TicketTypeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Acceso General"
+        descripcion:
+          type: string
+          nullable: true
+        precio:
+          type: number
+          format: double
+          example: 850.00
+        capacidad:
+          type: integer
+          example: 500
+        vendidos:
+          type: integer
+          example: 120
+        disponibles:
+          type: integer
+          description: capacidad - vendidos
+          example: 380
+      required: [id, event_id, nombre, precio, capacidad, vendidos, disponibles]
+
+    CreateTicketTypeRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 150
+          example: "VIP Front Stage"
+        descripcion:
+          type: string
+          nullable: true
+          example: "Área VIP + barra abierta"
+        precio:
+          type: number
+          format: double
+          minimum: 0
+          example: 1850.00
+        capacidad:
+          type: integer
+          minimum: 1
+          example: 100
+      required: [nombre, precio, capacidad]
+
+    # --------------------------------------------------------------------------
+    # ORDERS
+    # --------------------------------------------------------------------------
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        ticket_type:
+          $ref: '#/components/schemas/TicketTypeResponse'
+        evento:
+          $ref: '#/components/schemas/EventSummaryResponse'
+        cantidad:
+          type: integer
+          example: 2
+        total:
+          type: number
+          format: double
+          example: 1700.00
+        estado:
+          type: string
+          enum: [pending, confirmed, cancelled]
+        tickets:
+          type: array
+          description: Solo presente cuando estado = confirmed
+          items:
+            $ref: '#/components/schemas/TicketResponse'
+        created_at:
+          type: string
+          format: date-time
+      required: [id, user_id, ticket_type, evento, cantidad, total, estado, created_at]
+
+    CreateOrderRequest:
+      type: object
+      properties:
+        ticket_type_id:
+          type: string
+          format: uuid
+          example: "e1b2c3d4-0001-0000-0000-000000000001"
+        cantidad:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 2
+      required: [ticket_type_id, cantidad]
+
+    # --------------------------------------------------------------------------
+    # TICKETS
+    # --------------------------------------------------------------------------
+    TicketResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        codigo_qr:
+          type: string
+          description: Código único de validación de acceso
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        usado:
+          type: boolean
+          example: false
+        evento:
+          $ref: '#/components/schemas/EventSummaryResponse'
+        ticket_type_nombre:
+          type: string
+          example: "Acceso General"
+        created_at:
+          type: string
+          format: date-time
+      required: [id, order_id, codigo_qr, usado, evento, ticket_type_nombre, created_at]
+
+    # --------------------------------------------------------------------------
+    # FOLLOWING
+    # --------------------------------------------------------------------------
+    FollowingResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        artist_id:
+          type: string
+          format: uuid
+        followed_at:
+          type: string
+          format: date-time
+      required: [user_id, artist_id, followed_at]
+
+    # --------------------------------------------------------------------------
+    # PAGINATION
+    # --------------------------------------------------------------------------
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        total_elements:
+          type: integer
+          example: 85
+        total_pages:
+          type: integer
+          example: 5
+      required: [page, size, total_elements, total_pages]
+
+    PagedEventsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSummaryResponse'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      required: [data, meta]
+
+    PagedArtistsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtistResponse'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+      required: [data, meta]
+
+# ==============================================================================
+# PATHS
+# ==============================================================================
+paths:
+
+  # ============================================================================
+  # AUTH
+  # ============================================================================
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Obtener perfil propio
+      description: |
+        Devuelve el perfil del usuario autenticado incluyendo si es organizador o artista.
+        Usar al iniciar sesión para saber qué pantallas mostrar en el frontend.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthProfileResponse'
+        '401':
+          description: Token inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # USERS
+  # ============================================================================
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Obtener perfil público de un usuario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Perfil público del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Users]
+      summary: Actualizar perfil propio
+      description: Solo el propio usuario puede editar su perfil.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '403':
+          description: No autorizado para editar este perfil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # ORGANIZERS
+  # ============================================================================
+  /organizers:
+    post:
+      tags: [Organizers]
+      summary: Registrarse como organizador
+      description: |
+        Cualquier usuario autenticado puede crear su perfil de organizador.
+        Solo se permite un perfil por usuario (relación 1:1).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizerRequest'
+      responses:
+        '201':
+          description: Perfil de organizador creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerResponse'
+        '409':
+          description: El usuario ya tiene un perfil de organizador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /organizers/{id}:
+    get:
+      tags: [Organizers]
+      summary: Obtener perfil de un organizador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Perfil del organizador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerResponse'
+        '404':
+          description: Organizador no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Organizers]
+      summary: Actualizar perfil de organizador
+      description: Solo el organizador propietario puede editar su perfil.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizerRequest'
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerResponse'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /organizers/{id}/events:
+    get:
+      tags: [Organizers]
+      summary: Listar eventos de un organizador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, cancelled]
+          description: Filtrar por estado. Sin token solo devuelve published.
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de eventos del organizador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedEventsResponse'
+
+  # ============================================================================
+  # ARTISTS
+  # ============================================================================
+  /artists:
+    get:
+      tags: [Artists]
+      summary: Listar artistas
+      description: Endpoint público. Soporta búsqueda por nombre y filtro por género.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Búsqueda por nombre del artista
+        - name: genero
+          in: query
+          schema:
+            type: string
+          description: Filtrar por género musical
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de artistas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedArtistsResponse'
+
+    post:
+      tags: [Artists]
+      summary: Registrarse como artista
+      description: |
+        Cualquier usuario autenticado puede crear su perfil de artista.
+        Solo se permite un perfil por usuario.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArtistRequest'
+      responses:
+        '201':
+          description: Perfil de artista creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistResponse'
+        '409':
+          description: El usuario ya tiene un perfil de artista
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /artists/{id}:
+    get:
+      tags: [Artists]
+      summary: Obtener perfil de un artista
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Perfil del artista
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistResponse'
+        '404':
+          description: Artista no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Artists]
+      summary: Actualizar perfil de artista
+      description: Solo el artista propietario puede editar su perfil.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateArtistRequest'
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistResponse'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /artists/{id}/events:
+    get:
+      tags: [Artists]
+      summary: Listar próximos eventos de un artista
+      description: Devuelve eventos publicados donde este artista participa.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de eventos del artista
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedEventsResponse'
+
+  # ============================================================================
+  # EVENTS
+  # ============================================================================
+  /events:
+    get:
+      tags: [Events]
+      summary: Listar eventos publicados
+      description: Endpoint público. Soporta múltiples filtros y paginación.
+      parameters:
+        - name: ciudad
+          in: query
+          schema:
+            type: string
+          description: Filtrar por ciudad
+          example: "Ciudad de México"
+        - name: genero
+          in: query
+          schema:
+            type: string
+          description: Filtrar por género musical de los artistas participantes
+        - name: fecha_desde
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Eventos desde esta fecha (inclusive)
+        - name: fecha_hasta
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Eventos hasta esta fecha (inclusive)
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Búsqueda por nombre de evento o artista
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de eventos publicados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedEventsResponse'
+
+    post:
+      tags: [Events]
+      summary: Crear un evento
+      description: |
+        Solo usuarios con perfil de organizador pueden crear eventos.
+        El evento se crea en estado **draft** por defecto.
+        Los artistas y ticket_types se agregan en endpoints separados.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          description: Evento creado en estado draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetailResponse'
+        '403':
+          description: El usuario no tiene perfil de organizador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}:
+    get:
+      tags: [Events]
+      summary: Obtener detalle completo de un evento
+      description: Incluye artistas, ticket_types y disponibilidad.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle completo del evento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetailResponse'
+        '404':
+          description: Evento no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Events]
+      summary: Actualizar datos de un evento
+      description: Solo el organizador propietario puede editar. No funciona si el evento está cancelado.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Evento actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetailResponse'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Events]
+      summary: Cancelar un evento
+      description: |
+        Cambia el estado a **cancelled**. No elimina el registro.
+        Falla si el evento tiene órdenes confirmadas (RN-07).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Evento cancelado exitosamente
+        '409':
+          description: El evento tiene órdenes confirmadas y no puede cancelarse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/publish:
+    post:
+      tags: [Events]
+      summary: Publicar un evento
+      description: |
+        Cambia el estado de **draft** a **published**.
+        A partir de este momento el evento es visible al público.
+        Requiere al menos un ticket_type definido.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishEventRequest'
+      responses:
+        '200':
+          description: Evento publicado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetailResponse'
+        '422':
+          description: El evento no tiene ticket_types definidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/artists:
+    post:
+      tags: [Events]
+      summary: Agregar artista al evento
+      description: El artista debe existir en la plataforma. No permite duplicados (RN-04).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddArtistToEventRequest'
+      responses:
+        '201':
+          description: Artista agregado al evento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetailResponse'
+        '409':
+          description: El artista ya está en este evento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/artists/{artistId}:
+    delete:
+      tags: [Events]
+      summary: Remover artista del evento
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Artista removido del evento
+
+  # ============================================================================
+  # TICKET TYPES
+  # ============================================================================
+  /events/{eventId}/ticket-types:
+    post:
+      tags: [TicketTypes]
+      summary: Agregar tipo de boleto a un evento
+      description: Solo el organizador propietario del evento puede agregar ticket_types.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketTypeRequest'
+      responses:
+        '201':
+          description: Tipo de boleto creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketTypeResponse'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{eventId}/ticket-types/{ticketTypeId}:
+    delete:
+      tags: [TicketTypes]
+      summary: Eliminar tipo de boleto
+      description: Solo si no tiene órdenes confirmadas asociadas.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ticketTypeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Tipo de boleto eliminado
+        '409':
+          description: El tipo de boleto tiene órdenes confirmadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # ORDERS
+  # ============================================================================
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Crear una orden de compra
+      description: |
+        Crea una orden en estado **pending**.
+        Valida disponibilidad antes de crear (RN-01).
+        El total se calcula automáticamente: cantidad × precio unitario.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Orden creada en estado pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: No hay suficientes boletos disponibles (RN-01)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/my:
+    get:
+      tags: [Orders]
+      summary: Listar mis órdenes
+      description: Devuelve todas las órdenes del usuario autenticado.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista de órdenes del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrderResponse'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+
+  /orders/{id}/confirm:
+    post:
+      tags: [Orders]
+      summary: Confirmar una orden
+      description: |
+        Cambia el estado a **confirmed**.
+        Dispara la generación automática de tickets (un ticket por unidad).
+        Incrementa el contador `vendidos` en ticket_types.
+        Solo el dueño de la orden puede confirmarla.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Orden confirmada con tickets generados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: La orden ya fue confirmada o cancelada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancelar una orden
+      description: |
+        Cancela una orden en estado **pending**.
+        No se puede cancelar una orden ya confirmada desde este endpoint.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Orden cancelada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: La orden ya fue confirmada y no puede cancelarse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # TICKETS
+  # ============================================================================
+  /tickets/my:
+    get:
+      tags: [Tickets]
+      summary: Listar mis boletos
+      description: Devuelve todos los tickets del usuario autenticado con detalle del evento.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista de boletos del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TicketResponse'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Obtener detalle de un ticket
+      description: Solo el dueño del ticket puede consultarlo.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle del ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # FOLLOWING
+  # ============================================================================
+  /artists/{id}/follow:
+    post:
+      tags: [Following]
+      summary: Seguir a un artista
+      description: El usuario autenticado sigue al artista. No permite duplicados (RN-03).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Artista seguido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowingResponse'
+        '409':
+          description: El usuario ya sigue a este artista
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Following]
+      summary: Dejar de seguir a un artista
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Dejaste de seguir al artista
+
+  /users/me/following:
+    get:
+      tags: [Following]
+      summary: Listar artistas que sigo
+      description: Devuelve todos los artistas que sigue el usuario autenticado.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Lista de artistas seguidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedArtistsResponse'

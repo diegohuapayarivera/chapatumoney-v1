@@ -1,0 +1,732 @@
+{
+  "info": {
+    "name": "ChapatuTicket API",
+    "description": "Colección completa de la API REST de ChapatuTicket — Spring Boot 4 + Supabase.\n\n**Setup:**\n1. Registra un usuario en tu frontend (Supabase Auth)\n2. Copia el JWT desde Supabase Dashboard > Authentication > Users > tu usuario > Copy token\n3. Pega el token en la variable `token` (botón Edit en la colección)\n4. Ejecuta '🔐 Auth > Mi Perfil' para verificar\n\nBase URL: `{{baseUrl}}`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",        "value": "http://localhost:8080",  "type": "string" },
+    { "key": "token",          "value": "PEGA_AQUI_TU_JWT",       "type": "string" },
+    { "key": "userId",         "value": "",                        "type": "string" },
+    { "key": "organizerId",    "value": "",                        "type": "string" },
+    { "key": "artistId",       "value": "",                        "type": "string" },
+    { "key": "eventId",        "value": "",                        "type": "string" },
+    { "key": "ticketTypeId",   "value": "",                        "type": "string" },
+    { "key": "orderId",        "value": "",                        "type": "string" },
+    { "key": "ticketId",       "value": "",                        "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Mi Perfil (me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('userId', body.id);",
+                  "    if (body.organizerId) pm.collectionVariables.set('organizerId', body.organizerId);",
+                  "    if (body.artistId)    pm.collectionVariables.set('artistId', body.artistId);",
+                  "    pm.test('Perfil obtenido correctamente', () => pm.response.to.have.status(200));",
+                  "    console.log('userId guardado:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] },
+            "description": "Retorna el perfil completo del usuario autenticado, incluyendo roles (isOrganizer, isArtist).\n\n✅ Guarda automáticamente userId, organizerId y artistId en las variables."
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Usuarios",
+      "item": [
+        {
+          "name": "Obtener Usuario (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Endpoint público — no requiere JWT."
+          }
+        },
+        {
+          "name": "Actualizar mi Perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Mi Nombre Actualizado\",\n  \"avatarUrl\": \"https://i.pravatar.cc/150?img=3\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Solo puedes editar tu propio perfil (valida que el token coincide con el ID)."
+          }
+        },
+        {
+          "name": "Artistas que sigo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/following?page=0&size=20",
+              "host": ["{{baseUrl}}"], "path": ["api", "users", "me", "following"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Organizadores",
+      "item": [
+        {
+          "name": "Crear Perfil de Organizador",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('organizerId', body.id);",
+                  "    pm.test('Organizador creado', () => pm.response.to.have.status(201));",
+                  "    console.log('organizerId guardado:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Mi Promotora Musical\",\n  \"descripcion\": \"Organizamos los mejores eventos de Lima\",\n  \"logoUrl\": \"https://picsum.photos/seed/org1/200\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/organizers",
+              "host": ["{{baseUrl}}"], "path": ["api", "organizers"]
+            },
+            "description": "Un usuario solo puede tener UN perfil de organizador (devuelve 409 si ya existe)."
+          }
+        },
+        {
+          "name": "Obtener Organizador (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/organizers/{{organizerId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "organizers", "{{organizerId}}"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar Organizador",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Promotora Actualizada\",\n  \"descripcion\": \"Nueva descripción con más detalles\",\n  \"logoUrl\": \"https://picsum.photos/seed/org2/200\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/organizers/{{organizerId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "organizers", "{{organizerId}}"]
+            }
+          }
+        },
+        {
+          "name": "Eventos del Organizador",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/organizers/{{organizerId}}/events?page=0&size=10",
+              "host": ["{{baseUrl}}"], "path": ["api", "organizers", "{{organizerId}}", "events"],
+              "query": [
+                { "key": "estado", "value": "published", "disabled": true, "description": "draft | published | cancelled" },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎤 Artistas",
+      "item": [
+        {
+          "name": "Listar Artistas (búsqueda)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/artists?page=0&size=20",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists"],
+              "query": [
+                { "key": "q",      "value": "rock",    "disabled": true, "description": "buscar por nombre" },
+                { "key": "genero", "value": "cumbia",  "disabled": true, "description": "filtrar por género" },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear Perfil de Artista",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('artistId', body.id);",
+                  "    pm.test('Artista creado', () => pm.response.to.have.status(201));",
+                  "    console.log('artistId guardado:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"DJ Cumbiambero\",\n  \"genero\": \"Cumbia\",\n  \"bio\": \"El rey de la cumbia peruana con más de 10 años de trayectoria.\",\n  \"fotoUrl\": \"https://picsum.photos/seed/artist1/400\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/artists",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Artista (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/artists/{{artistId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists", "{{artistId}}"]
+            },
+            "description": "Con JWT: incluye campo `isFollowing`. Sin JWT: isFollowing = null."
+          }
+        },
+        {
+          "name": "Actualizar Artista",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"DJ Cumbiambero PRO\",\n  \"genero\": \"Cumbia Fusión\",\n  \"bio\": \"Bio actualizada con más experiencia\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/artists/{{artistId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists", "{{artistId}}"]
+            }
+          }
+        },
+        {
+          "name": "Eventos del Artista",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/artists/{{artistId}}/events?page=0&size=10",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists", "{{artistId}}", "events"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Seguir Artista ❤️",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/artists/{{artistId}}/follow",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists", "{{artistId}}", "follow"]
+            },
+            "description": "Devuelve 409 si ya lo sigues."
+          }
+        },
+        {
+          "name": "Dejar de Seguir Artista 💔",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/artists/{{artistId}}/follow",
+              "host": ["{{baseUrl}}"], "path": ["api", "artists", "{{artistId}}", "follow"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎉 Eventos",
+      "item": [
+        {
+          "name": "Listar Eventos (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events?page=0&size=20",
+              "host": ["{{baseUrl}}"], "path": ["api", "events"],
+              "query": [
+                { "key": "ciudad",      "value": "Lima",       "disabled": true },
+                { "key": "genero",      "value": "Cumbia",     "disabled": true },
+                { "key": "fecha_desde", "value": "2025-01-01", "disabled": true },
+                { "key": "fecha_hasta", "value": "2025-12-31", "disabled": true },
+                { "key": "q",          "value": "rock",        "disabled": true },
+                { "key": "page",       "value": "0" },
+                { "key": "size",       "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear Evento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('eventId', body.id);",
+                  "    pm.test('Evento creado', () => pm.response.to.have.status(201));",
+                  "    console.log('eventId guardado:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Festival Cumbia Lima 2025\",\n  \"descripcion\": \"El festival de cumbia más grande del Perú\",\n  \"lugar\": \"Estadio San Marcos\",\n  \"ciudad\": \"Lima\",\n  \"fechaInicio\": \"2025-08-15T20:00:00-05:00\",\n  \"fechaFin\": \"2025-08-16T02:00:00-05:00\",\n  \"imagenUrl\": \"https://picsum.photos/seed/event1/800/400\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events",
+              "host": ["{{baseUrl}}"], "path": ["api", "events"]
+            },
+            "description": "Requiere ser organizador. El evento se crea en estado `draft`."
+          }
+        },
+        {
+          "name": "Obtener Evento (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar Evento",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Festival Cumbia Lima 2025 — Edición Especial\",\n  \"descripcion\": \"Descripción actualizada\",\n  \"ciudad\": \"Lima\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Publicar Evento (draft → published)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmar\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/publish",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "publish"]
+            },
+            "description": "⚠️ El evento debe tener al menos un TicketType antes de publicar."
+          }
+        },
+        {
+          "name": "Cancelar Evento",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}"]
+            },
+            "description": "⚠️ Falla con 409 si hay órdenes confirmadas."
+          }
+        },
+        {
+          "name": "Agregar Artista al Evento",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"artistId\": \"{{artistId}}\",\n  \"orden\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/artists",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "artists"]
+            }
+          }
+        },
+        {
+          "name": "Quitar Artista del Evento",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/artists/{{artistId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "artists", "{{artistId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎫 Tipos de Boleto",
+      "item": [
+        {
+          "name": "Crear Tipo de Boleto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('ticketTypeId', body.id);",
+                  "    pm.test('TicketType creado', () => pm.response.to.have.status(201));",
+                  "    console.log('ticketTypeId guardado:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"General\",\n  \"descripcion\": \"Entrada general al festival\",\n  \"precio\": 50.00,\n  \"capacidad\": 500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/ticket-types",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "ticket-types"]
+            }
+          }
+        },
+        {
+          "name": "Crear Tipo VIP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"VIP\",\n  \"descripcion\": \"Acceso VIP con zona preferencial y consumo incluido\",\n  \"precio\": 150.00,\n  \"capacidad\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/ticket-types",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "ticket-types"]
+            }
+          }
+        },
+        {
+          "name": "Eliminar Tipo de Boleto",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/ticket-types/{{ticketTypeId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "ticket-types", "{{ticketTypeId}}"]
+            },
+            "description": "⚠️ Falla con 409 si hay órdenes confirmadas para este tipo."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Órdenes",
+      "item": [
+        {
+          "name": "Crear Orden (comprar boletos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('orderId', body.id);",
+                  "    pm.test('Orden creada', () => pm.response.to.have.status(201));",
+                  "    console.log('orderId guardado:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticketTypeId\": \"{{ticketTypeId}}\",\n  \"cantidad\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"], "path": ["api", "orders"]
+            },
+            "description": "- Crea una orden en estado `pending`\n- Valida disponibilidad (capacidad - vendidos)\n- Cantidad máxima: 10 por orden"
+          }
+        },
+        {
+          "name": "Mis Órdenes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/my?page=0&size=20",
+              "host": ["{{baseUrl}}"], "path": ["api", "orders", "my"],
+              "query": [
+                { "key": "estado", "value": "confirmed", "disabled": true, "description": "pending | confirmed | cancelled" },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Confirmar Orden → Genera Boletos 🎫",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.tickets && body.tickets.length > 0) {",
+                  "        pm.collectionVariables.set('ticketId', body.tickets[0].id);",
+                  "        console.log('ticketId guardado:', body.tickets[0].id);",
+                  "    }",
+                  "    pm.test('Orden confirmada y boletos generados', () => pm.response.to.have.status(200));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}/confirm",
+              "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "confirm"]
+            },
+            "description": "✅ Cambia estado a `confirmed`, incrementa `vendidos` en el ticket_type y genera N boletos con código QR único."
+          }
+        },
+        {
+          "name": "Cancelar Orden",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}/cancel",
+              "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "cancel"]
+            },
+            "description": "⚠️ Solo se pueden cancelar órdenes en estado `pending`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎟️ Boletos",
+      "item": [
+        {
+          "name": "Mis Boletos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/my?page=0&size=20",
+              "host": ["{{baseUrl}}"], "path": ["api", "tickets", "my"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver Boleto (con QR)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "tickets", "{{ticketId}}"]
+            },
+            "description": "Retorna el `codigoQr` único del boleto para mostrar en el frontend."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Flujo Completo (ejecutar en orden)",
+      "description": "Ejecuta estas requests en orden para probar el flujo completo:\n\n1. 🔐 Mi Perfil — obtiene userId\n2. 🏢 Crear Organizador\n3. 🎤 Crear Artista\n4. 🎉 Crear Evento\n5. 🎫 Crear Tipo de Boleto (General)\n6. 🎉 Publicar Evento\n7. 🎉 Agregar Artista al Evento\n8. 📦 Crear Orden\n9. 📦 Confirmar Orden → genera tickets\n10. 🎟️ Mis Boletos",
+      "item": [
+        {
+          "name": "1. Mi Perfil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "2. Crear Organizador",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Promotora Demo\",\n  \"descripcion\": \"Organizador de prueba\",\n  \"logoUrl\": \"https://picsum.photos/seed/demo/200\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/organizers", "host": ["{{baseUrl}}"], "path": ["api", "organizers"] }
+          }
+        },
+        {
+          "name": "3. Crear Evento (draft)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Evento Demo 2025\",\n  \"descripcion\": \"Evento de prueba\",\n  \"lugar\": \"Centro de Lima\",\n  \"ciudad\": \"Lima\",\n  \"fechaInicio\": \"2025-10-01T20:00:00-05:00\",\n  \"fechaFin\": \"2025-10-02T00:00:00-05:00\",\n  \"imagenUrl\": \"https://picsum.photos/seed/demo-event/800/400\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/events", "host": ["{{baseUrl}}"], "path": ["api", "events"] }
+          }
+        },
+        {
+          "name": "4. Crear Tipo de Boleto",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"General\",\n  \"descripcion\": \"Entrada general\",\n  \"precio\": 30.00,\n  \"capacidad\": 200\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/ticket-types",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "ticket-types"]
+            }
+          }
+        },
+        {
+          "name": "5. Publicar Evento",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"confirmar\": true\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/publish",
+              "host": ["{{baseUrl}}"], "path": ["api", "events", "{{eventId}}", "publish"]
+            }
+          }
+        },
+        {
+          "name": "6. Crear Orden",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticketTypeId\": \"{{ticketTypeId}}\",\n  \"cantidad\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
+          }
+        },
+        {
+          "name": "7. Confirmar Orden",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}/confirm",
+              "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "confirm"]
+            }
+          }
+        },
+        {
+          "name": "8. Mis Boletos ✅",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/tickets/my", "host": ["{{baseUrl}}"], "path": ["api", "tickets", "my"] }
+          }
+        }
+      ]
+    }
+  ]
+}

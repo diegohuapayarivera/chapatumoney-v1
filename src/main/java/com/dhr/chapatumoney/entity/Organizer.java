@@ -1,0 +1,43 @@
+package com.dhr.chapatumoney.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "organizers", schema = "public")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Organizer {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(nullable = false)
+    private String nombre;
+
+    @Column(columnDefinition = "text")
+    private String descripcion;
+
+    @Column(name = "logo_url")
+    private String logoUrl;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = OffsetDateTime.now();
+    }
+}
