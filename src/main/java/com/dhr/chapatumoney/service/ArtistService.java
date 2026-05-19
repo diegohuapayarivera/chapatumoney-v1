@@ -39,8 +39,13 @@ public class ArtistService {
         User user = userRepository.findById(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
+        if (artistRepository.existsBySlug(request.getSlug())) {
+            throw new ConflictException("El slug ya está en uso");
+        }
+
         Artist artist = Artist.builder()
                 .user(user)
+                .slug(request.getSlug())
                 .nombre(request.getNombre())
                 .genero(request.getGenero())
                 .bio(request.getBio())
@@ -56,6 +61,13 @@ public class ArtistService {
         return toResponse(artist, authenticatedUserId);
     }
 
+    @Transactional(readOnly = true)
+    public ArtistResponse getArtistBySlug(String slug, String authenticatedUserId) {
+        Artist artist = artistRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Artista no encontrado con slug: " + slug));
+        return toResponse(artist, authenticatedUserId);
+    }
+
     @Transactional
     public ArtistResponse updateArtist(UUID id, UpdateArtistRequest request, String userId) {
         Artist artist = findById(id);
@@ -64,6 +76,12 @@ public class ArtistService {
             throw new UnauthorizedException("No estás autorizado para editar este perfil de artista");
         }
 
+        if (request.getSlug() != null && !request.getSlug().equals(artist.getSlug())) {
+            if (artistRepository.existsBySlug(request.getSlug())) {
+                throw new ConflictException("El slug ya está en uso");
+            }
+            artist.setSlug(request.getSlug());
+        }
         if (request.getNombre() != null) artist.setNombre(request.getNombre());
         if (request.getGenero() != null) artist.setGenero(request.getGenero());
         if (request.getBio() != null) artist.setBio(request.getBio());
@@ -92,6 +110,7 @@ public class ArtistService {
 
         return ArtistResponse.builder()
                 .id(artist.getId())
+                .slug(artist.getSlug())
                 .nombre(artist.getNombre())
                 .genero(artist.getGenero())
                 .bio(artist.getBio())

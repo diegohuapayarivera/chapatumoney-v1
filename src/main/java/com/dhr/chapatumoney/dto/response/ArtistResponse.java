@@ -10,6 +10,7 @@ import java.util.UUID;
 @Builder
 public class ArtistResponse {
     private UUID id;
+    private String slug;
     private String nombre;
     private String genero;
     private String bio;

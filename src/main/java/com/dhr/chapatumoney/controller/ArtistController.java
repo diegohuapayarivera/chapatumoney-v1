@@ -44,12 +44,17 @@ public class ArtistController {
                 .body(artistService.createArtist(request, auth.getName()));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{idOrSlug}")
     public ResponseEntity<ArtistResponse> getArtist(
-            @PathVariable UUID id,
+            @PathVariable String idOrSlug,
             Authentication auth) {
         String userId = auth != null ? auth.getName() : null;
-        return ResponseEntity.ok(artistService.getArtist(id, userId));
+        try {
+            UUID id = UUID.fromString(idOrSlug);
+            return ResponseEntity.ok(artistService.getArtist(id, userId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(artistService.getArtistBySlug(idOrSlug, userId));
+        }
     }
 
     @PatchMapping("/{id}")
@@ -60,11 +65,19 @@ public class ArtistController {
         return ResponseEntity.ok(artistService.updateArtist(id, request, auth.getName()));
     }
 
-    @GetMapping("/{id}/events")
+    @GetMapping("/{idOrSlug}/events")
     public ResponseEntity<PagedResponse<EventSummaryResponse>> getArtistEvents(
-            @PathVariable UUID id,
+            @PathVariable String idOrSlug,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        
+        UUID id;
+        try {
+            id = UUID.fromString(idOrSlug);
+        } catch (IllegalArgumentException e) {
+            id = artistService.getArtistBySlug(idOrSlug, null).getId();
+        }
+        
         return ResponseEntity.ok(eventService.getEventsByArtist(id, page, size));
     }
 }

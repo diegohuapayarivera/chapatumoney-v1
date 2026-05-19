@@ -176,6 +176,9 @@ components:
         user_id:
           type: string
           format: uuid
+        slug:
+          type: string
+          example: "produccion-sonica"
         nombre:
           type: string
           example: "Producción Sónica MX"
@@ -188,11 +191,15 @@ components:
         created_at:
           type: string
           format: date-time
-      required: [id, user_id, nombre, created_at]
+      required: [id, user_id, slug, nombre, created_at]
 
     CreateOrganizerRequest:
       type: object
       properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          example: "produccion-sonica"
         nombre:
           type: string
           minLength: 2
@@ -205,11 +212,14 @@ components:
         logo_url:
           type: string
           nullable: true
-      required: [nombre]
+      required: [slug, nombre]
 
     UpdateOrganizerRequest:
       type: object
       properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
         nombre:
           type: string
           minLength: 2
@@ -230,6 +240,9 @@ components:
         id:
           type: string
           format: uuid
+        slug:
+          type: string
+          example: "mara-kane"
         nombre:
           type: string
           example: "Mara Kane"
@@ -253,11 +266,15 @@ components:
         created_at:
           type: string
           format: date-time
-      required: [id, nombre, genero, followers_count, created_at]
+      required: [id, slug, nombre, genero, followers_count, created_at]
 
     CreateArtistRequest:
       type: object
       properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          example: "mara-kane"
         nombre:
           type: string
           minLength: 2
@@ -274,11 +291,14 @@ components:
         foto_url:
           type: string
           nullable: true
-      required: [nombre, genero]
+      required: [slug, nombre, genero]
 
     UpdateArtistRequest:
       type: object
       properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
         nombre:
           type: string
           minLength: 2

@@ -33,9 +33,14 @@ public class OrganizerController {
                 .body(organizerService.createOrganizer(request, auth.getName()));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<OrganizerResponse> getOrganizer(@PathVariable UUID id) {
-        return ResponseEntity.ok(organizerService.getOrganizer(id));
+    @GetMapping("/{idOrSlug}")
+    public ResponseEntity<OrganizerResponse> getOrganizer(@PathVariable String idOrSlug) {
+        try {
+            UUID id = UUID.fromString(idOrSlug);
+            return ResponseEntity.ok(organizerService.getOrganizer(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(organizerService.getOrganizerBySlug(idOrSlug));
+        }
     }
 
     @PatchMapping("/{id}")
@@ -46,12 +51,19 @@ public class OrganizerController {
         return ResponseEntity.ok(organizerService.updateOrganizer(id, request, auth.getName()));
     }
 
-    @GetMapping("/{id}/events")
+    @GetMapping("/{idOrSlug}/events")
     public ResponseEntity<PagedResponse<EventSummaryResponse>> getOrganizerEvents(
-            @PathVariable UUID id,
+            @PathVariable String idOrSlug,
             @RequestParam(required = false) String estado,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+
+        UUID id;
+        try {
+            id = UUID.fromString(idOrSlug);
+        } catch (IllegalArgumentException e) {
+            id = organizerService.getOrganizerBySlug(idOrSlug).getId();
+        }
 
         EventStatus status = estado != null ? EventStatus.valueOf(estado) : null;
         return ResponseEntity.ok(eventService.getEventsByOrganizer(id, status, page, size));

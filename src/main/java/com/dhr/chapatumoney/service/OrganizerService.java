@@ -34,8 +34,13 @@ public class OrganizerService {
         User user = userRepository.findById(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
+        if (organizerRepository.existsBySlug(request.getSlug())) {
+            throw new ConflictException("El slug ya está en uso");
+        }
+
         Organizer organizer = Organizer.builder()
                 .user(user)
+                .slug(request.getSlug())
                 .nombre(request.getNombre())
                 .descripcion(request.getDescripcion())
                 .logoUrl(request.getLogoUrl())
@@ -49,12 +54,26 @@ public class OrganizerService {
         return toResponse(findById(id));
     }
 
+    @Transactional(readOnly = true)
+    public OrganizerResponse getOrganizerBySlug(String slug) {
+        Organizer organizer = organizerRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Organizador no encontrado con slug: " + slug));
+        return toResponse(organizer);
+    }
+
     @Transactional
     public OrganizerResponse updateOrganizer(UUID id, UpdateOrganizerRequest request, String userId) {
         Organizer organizer = findById(id);
 
         if (!organizer.getUser().getId().toString().equals(userId)) {
             throw new UnauthorizedException("No estás autorizado para editar este perfil de organizador");
+        }
+
+        if (request.getSlug() != null && !request.getSlug().equals(organizer.getSlug())) {
+            if (organizerRepository.existsBySlug(request.getSlug())) {
+                throw new ConflictException("El slug ya está en uso");
+            }
+            organizer.setSlug(request.getSlug());
         }
 
         if (request.getNombre() != null) organizer.setNombre(request.getNombre());
@@ -73,6 +92,7 @@ public class OrganizerService {
         return OrganizerResponse.builder()
                 .id(o.getId())
                 .userId(o.getUser().getId())
+                .slug(o.getSlug())
                 .nombre(o.getNombre())
                 .descripcion(o.getDescripcion())
                 .logoUrl(o.getLogoUrl())

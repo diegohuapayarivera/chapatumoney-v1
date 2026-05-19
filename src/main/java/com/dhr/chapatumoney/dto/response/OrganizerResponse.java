@@ -11,6 +11,7 @@ import java.util.UUID;
 public class OrganizerResponse {
     private UUID id;
     private UUID userId;
+    private String slug;
     private String nombre;
     private String descripcion;
     private String logoUrl;

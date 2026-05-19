@@ -18,6 +18,10 @@ public interface ArtistRepository extends JpaRepository<Artist, UUID> {
 
     boolean existsByUserId(UUID userId);
 
+    Optional<Artist> findBySlug(String slug);
+
+    boolean existsBySlug(String slug);
+
     @Query("""
         SELECT a FROM Artist a
         WHERE (:q = '' OR LOWER(a.nombre) LIKE LOWER(CONCAT('%', :q, '%')))

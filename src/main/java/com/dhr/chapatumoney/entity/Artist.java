@@ -24,6 +24,9 @@ public class Artist {
     @JoinColumn(name = "user_id", unique = true)
     private User user;
 
+    @Column(nullable = false, unique = true)
+    private String slug;
+
     @Column(nullable = false)
     private String nombre;
 
