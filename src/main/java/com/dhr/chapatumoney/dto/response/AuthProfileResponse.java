@@ -1,5 +1,6 @@
 package com.dhr.chapatumoney.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,8 +14,13 @@ public class AuthProfileResponse {
     private String email;
     private String nombre;
     private String avatarUrl;
+
+    @JsonProperty("is_organizer")
     private boolean isOrganizer;
+    
+    @JsonProperty("is_artist")
     private boolean isArtist;
+    
     private UUID organizerId;
     private UUID artistId;
     private OffsetDateTime createdAt;
