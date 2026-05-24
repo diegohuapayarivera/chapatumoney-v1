@@ -104,7 +104,11 @@ public class OrderService {
             tickets.add(ticket);
         }
         ticketRepository.saveAll(tickets);
-        order.setTickets(tickets);
+        if (order.getTickets() == null) {
+            order.setTickets(new ArrayList<>());
+        }
+        order.getTickets().clear();
+        order.getTickets().addAll(tickets);
 
         return toResponse(orderRepository.save(order));
     }
