@@ -18,4 +18,5 @@ public class TicketTypeResponse {
     private int vendidos;
     /** capacidad - vendidos */
     private int disponibles;
+    private boolean conNumeracion;
 }

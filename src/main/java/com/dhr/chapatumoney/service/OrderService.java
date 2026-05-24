@@ -90,16 +90,22 @@ public class OrderService {
 
         // Increment vendidos
         TicketType ticketType = order.getTicketType();
-        ticketType.setVendidos(ticketType.getVendidos() + order.getCantidad());
+        int initialVendidos = ticketType.getVendidos();
+        ticketType.setVendidos(initialVendidos + order.getCantidad());
         ticketTypeRepository.save(ticketType);
 
         // Generate N tickets
         List<Ticket> tickets = new ArrayList<>();
         for (int i = 0; i < order.getCantidad(); i++) {
+            String seat = null;
+            if (Boolean.TRUE.equals(ticketType.getConNumeracion())) {
+                seat = "Asiento " + (initialVendidos + i + 1);
+            }
             Ticket ticket = Ticket.builder()
                     .order(order)
                     .codigoQr(UUID.randomUUID().toString())
                     .usado(false)
+                    .asiento(seat)
                     .build();
             tickets.add(ticket);
         }
@@ -180,6 +186,7 @@ public class OrderService {
                 .evento(eventService.toSummaryResponse(order.getTicketType().getEvent(), null))
                 .ticketTypeNombre(order.getTicketType().getNombre())
                 .createdAt(ticket.getCreatedAt())
+                .asiento(ticket.getAsiento())
                 .build();
     }
 }

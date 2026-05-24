@@ -49,6 +49,7 @@ public class TicketService {
                 .evento(eventService.toSummaryResponse(ticket.getOrder().getTicketType().getEvent(), null))
                 .ticketTypeNombre(ticket.getOrder().getTicketType().getNombre())
                 .createdAt(ticket.getCreatedAt())
+                .asiento(ticket.getAsiento())
                 .build();
     }
 }

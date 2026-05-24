@@ -39,4 +39,8 @@ public class TicketType {
     @Column(nullable = false)
     @Builder.Default
     private Integer vendidos = 0;
+
+    @Column(name = "con_numeracion", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean conNumeracion = false;
 }

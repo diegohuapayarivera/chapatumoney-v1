@@ -20,4 +20,6 @@ public class CreateTicketTypeRequest {
     @NotNull(message = "La capacidad es requerida")
     @Min(value = 1, message = "La capacidad mínima es 1")
     private Integer capacidad;
+
+    private Boolean conNumeracion;
 }

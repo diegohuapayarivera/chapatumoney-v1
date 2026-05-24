@@ -16,4 +16,5 @@ public class TicketResponse {
     private EventSummaryResponse evento;
     private String ticketTypeNombre;
     private OffsetDateTime createdAt;
+    private String asiento;
 }
