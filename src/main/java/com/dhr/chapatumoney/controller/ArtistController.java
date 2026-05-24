@@ -68,6 +68,7 @@ public class ArtistController {
     @GetMapping("/{idOrSlug}/events")
     public ResponseEntity<PagedResponse<EventSummaryResponse>> getArtistEvents(
             @PathVariable String idOrSlug,
+            @RequestParam(required = false, name = "time_filter") String timeFilter,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
@@ -78,6 +79,6 @@ public class ArtistController {
             id = artistService.getArtistBySlug(idOrSlug, null).getId();
         }
         
-        return ResponseEntity.ok(eventService.getEventsByArtist(id, page, size));
+        return ResponseEntity.ok(eventService.getEventsByArtist(id, timeFilter, page, size));
     }
 }

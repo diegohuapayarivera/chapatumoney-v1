@@ -55,6 +55,7 @@ public class OrganizerController {
     public ResponseEntity<PagedResponse<EventSummaryResponse>> getOrganizerEvents(
             @PathVariable String idOrSlug,
             @RequestParam(required = false) String estado,
+            @RequestParam(required = false, name = "time_filter") String timeFilter,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
@@ -66,6 +67,6 @@ public class OrganizerController {
         }
 
         EventStatus status = estado != null ? EventStatus.valueOf(estado) : null;
-        return ResponseEntity.ok(eventService.getEventsByOrganizer(id, status, page, size));
+        return ResponseEntity.ok(eventService.getEventsByOrganizer(id, status, timeFilter, page, size));
     }
 }

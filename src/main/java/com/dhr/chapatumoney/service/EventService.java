@@ -43,7 +43,7 @@ public class EventService {
                                                              String fechaDesde, String fechaHasta,
                                                              String q, int page, int size) {
         OffsetDateTime from = parseDate(fechaDesde, false);
-        if (from == null) from = OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        if (from == null) from = OffsetDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
 
         OffsetDateTime to = parseDate(fechaHasta, true);
         if (to == null) to = OffsetDateTime.of(2100, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
@@ -195,12 +195,12 @@ public class EventService {
     // =====================================================================
     @Transactional(readOnly = true)
     public PagedResponse<EventSummaryResponse> getEventsByOrganizer(UUID organizerId,
-                                                                      EventStatus estado, int page, int size) {
+                                                                      EventStatus estado, String timeFilter, int page, int size) {
         if (!organizerRepository.existsById(organizerId)) {
             throw new ResourceNotFoundException("Organizador no encontrado con id: " + organizerId);
         }
         Page<Event> events = eventRepository.findByOrganizerIdAndEstado(
-                organizerId, estado, PageRequest.of(page, size));
+                organizerId, estado, timeFilter, OffsetDateTime.now(), PageRequest.of(page, size));
         return PagedResponse.from(events, e -> toSummaryResponse(e, null));
     }
 
@@ -208,12 +208,12 @@ public class EventService {
     // PUBLIC: events by artist
     // =====================================================================
     @Transactional(readOnly = true)
-    public PagedResponse<EventSummaryResponse> getEventsByArtist(UUID artistId, int page, int size) {
+    public PagedResponse<EventSummaryResponse> getEventsByArtist(UUID artistId, String timeFilter, int page, int size) {
         if (!artistRepository.existsById(artistId)) {
             throw new ResourceNotFoundException("Artista no encontrado con id: " + artistId);
         }
         Page<Event> events = eventRepository.findPublishedEventsByArtistId(
-                artistId, PageRequest.of(page, size));
+                artistId, timeFilter, OffsetDateTime.now(), PageRequest.of(page, size));
         return PagedResponse.from(events, e -> toSummaryResponse(e, null));
     }
 

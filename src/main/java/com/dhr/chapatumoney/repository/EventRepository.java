@@ -39,10 +39,15 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
         SELECT e FROM Event e
         WHERE e.organizer.id = :organizerId
           AND (:estado IS NULL OR e.estado = :estado)
+          AND (:timeFilter IS NULL 
+               OR (:timeFilter = 'upcoming' AND e.fechaInicio >= :now)
+               OR (:timeFilter = 'past' AND e.fechaInicio < :now))
         """)
     Page<Event> findByOrganizerIdAndEstado(
             @Param("organizerId") UUID organizerId,
             @Param("estado") EventStatus estado,
+            @Param("timeFilter") String timeFilter,
+            @Param("now") OffsetDateTime now,
             Pageable pageable);
 
     @Query("""
@@ -50,8 +55,13 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
         JOIN e.eventArtists ea
         WHERE ea.artist.id = :artistId
           AND e.estado = 'published'
+          AND (:timeFilter IS NULL 
+               OR (:timeFilter = 'upcoming' AND e.fechaInicio >= :now)
+               OR (:timeFilter = 'past' AND e.fechaInicio < :now))
         """)
     Page<Event> findPublishedEventsByArtistId(
             @Param("artistId") UUID artistId,
+            @Param("timeFilter") String timeFilter,
+            @Param("now") OffsetDateTime now,
             Pageable pageable);
 }
