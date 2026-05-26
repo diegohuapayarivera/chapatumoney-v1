@@ -52,6 +52,17 @@ public class OrderService {
             throw new ConflictException("No hay suficientes boletos disponibles. Disponibles: " + disponibles);
         }
 
+        // Validar si requiere carnet CONADIS
+        if (Boolean.TRUE.equals(ticketType.getRequiereConadis())) {
+            String numConadis = request.getNumeroConadis();
+            if (numConadis == null || numConadis.trim().isEmpty()) {
+                throw new BusinessRuleException("Se requiere un número de carnet CONADIS para comprar este tipo de boleto.");
+            }
+            if (!numConadis.trim().matches("^[a-zA-Z0-9-]{3,20}$")) {
+                throw new BusinessRuleException("El número de carnet CONADIS ingresado no tiene un formato válido (ej. D-123456).");
+            }
+        }
+
         User user = userRepository.findById(userUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
@@ -63,6 +74,7 @@ public class OrderService {
                 .cantidad(request.getCantidad())
                 .total(total)
                 .estado(OrderStatus.pending)
+                .numeroConadis(Boolean.TRUE.equals(ticketType.getRequiereConadis()) ? request.getNumeroConadis().trim() : null)
                 .build();
 
         return toResponse(orderRepository.save(order));
@@ -174,6 +186,7 @@ public class OrderService {
                 .estado(order.getEstado())
                 .tickets(ticketResponses)
                 .createdAt(order.getCreatedAt())
+                .numeroConadis(order.getNumeroConadis())
                 .build();
     }
 

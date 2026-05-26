@@ -22,4 +22,5 @@ public class OrderResponse {
     /** Populated only when estado = confirmed */
     private List<TicketResponse> tickets;
     private OffsetDateTime createdAt;
+    private String numeroConadis;
 }

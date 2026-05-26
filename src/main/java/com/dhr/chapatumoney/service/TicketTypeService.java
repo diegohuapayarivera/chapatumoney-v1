@@ -42,6 +42,7 @@ public class TicketTypeService {
                 .capacidad(request.getCapacidad())
                 .vendidos(0)
                 .conNumeracion(request.getConNumeracion() != null && request.getConNumeracion())
+                .requiereConadis(request.getRequiereConadis() != null && request.getRequiereConadis())
                 .build();
 
         return toResponse(ticketTypeRepository.save(ticketType));
@@ -79,6 +80,7 @@ public class TicketTypeService {
                 .vendidos(t.getVendidos())
                 .disponibles(t.getCapacidad() - t.getVendidos())
                 .conNumeracion(t.getConNumeracion() != null && t.getConNumeracion())
+                .requiereConadis(t.getRequiereConadis() != null && t.getRequiereConadis())
                 .build();
     }
 }

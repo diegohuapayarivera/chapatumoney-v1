@@ -43,4 +43,8 @@ public class TicketType {
     @Column(name = "con_numeracion", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private Boolean conNumeracion = false;
+
+    @Column(name = "requiere_conadis", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean requiereConadis = false;
 }

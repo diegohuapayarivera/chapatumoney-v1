@@ -19,4 +19,5 @@ public class TicketTypeResponse {
     /** capacidad - vendidos */
     private int disponibles;
     private boolean conNumeracion;
+    private boolean requiereConadis;
 }

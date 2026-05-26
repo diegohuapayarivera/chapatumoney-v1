@@ -22,4 +22,5 @@ public class CreateTicketTypeRequest {
     private Integer capacidad;
 
     private Boolean conNumeracion;
+    private Boolean requiereConadis;
 }
