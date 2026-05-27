@@ -14,6 +14,7 @@ public class AuthProfileResponse {
     private String email;
     private String nombre;
     private String avatarUrl;
+    private String role;
 
     @JsonProperty("is_organizer")
     private boolean isOrganizer;

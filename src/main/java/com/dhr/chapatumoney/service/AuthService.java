@@ -38,6 +38,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .nombre(user.getNombre())
                 .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole())
                 .isOrganizer(organizer.isPresent())
                 .isArtist(artist.isPresent())
                 .organizerId(organizer.map(Organizer::getId).orElse(null))

@@ -25,4 +25,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             Pageable pageable);
 
     boolean existsByTicketTypeEventIdAndEstado(UUID eventId, OrderStatus estado);
+
+    @Query("SELECT COALESCE(SUM(o.total), 0) FROM Order o WHERE o.estado = :estado")
+    java.math.BigDecimal sumTotalByEstado(@Param("estado") OrderStatus estado);
+
+    @Query("SELECT COALESCE(SUM(o.cantidad), 0) FROM Order o WHERE o.estado = :estado")
+    Long sumCantidadByEstado(@Param("estado") OrderStatus estado);
 }
