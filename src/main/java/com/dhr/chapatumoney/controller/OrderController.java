@@ -36,7 +36,7 @@ public class OrderController {
             @RequestParam(defaultValue = "20") int size,
             Authentication auth) {
 
-        OrderStatus status = estado != null ? OrderStatus.valueOf(estado) : null;
+        OrderStatus status = estado != null ? OrderStatus.valueOf(estado.toLowerCase()) : null;
         return ResponseEntity.ok(orderService.getMyOrders(auth.getName(), status, page, size));
     }
 

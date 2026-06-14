@@ -28,6 +28,10 @@ public class PagedResponse<T> {
 
     public static <S, T> PagedResponse<T> from(Page<S> page, Function<S, T> mapper) {
         List<T> mapped = page.getContent().stream().map(mapper).collect(Collectors.toList());
+        return from(page, mapped);
+    }
+
+    public static <S, T> PagedResponse<T> from(Page<S> page, List<T> mapped) {
         return PagedResponse.<T>builder()
                 .data(mapped)
                 .meta(PageMeta.builder()

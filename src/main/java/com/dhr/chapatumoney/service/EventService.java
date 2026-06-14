@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -55,7 +56,7 @@ public class EventService {
         Page<Event> events = eventRepository.searchPublishedEvents(
                 safeCiudad, safeGenero, from, to, safeQ, PageRequest.of(page, size));
 
-        return PagedResponse.from(events, e -> toSummaryResponse(e, null));
+        return PagedResponse.from(events, toSummaryResponsesBulk(events.getContent(), null));
     }
 
     // =====================================================================
@@ -201,7 +202,7 @@ public class EventService {
         }
         Page<Event> events = eventRepository.findByOrganizerIdAndEstado(
                 organizerId, estado, timeFilter, OffsetDateTime.now(), PageRequest.of(page, size));
-        return PagedResponse.from(events, e -> toSummaryResponse(e, null));
+        return PagedResponse.from(events, toSummaryResponsesBulk(events.getContent(), null));
     }
 
     // =====================================================================
@@ -214,7 +215,7 @@ public class EventService {
         }
         Page<Event> events = eventRepository.findPublishedEventsByArtistId(
                 artistId, timeFilter, OffsetDateTime.now(), PageRequest.of(page, size));
-        return PagedResponse.from(events, e -> toSummaryResponse(e, null));
+        return PagedResponse.from(events, toSummaryResponsesBulk(events.getContent(), null));
     }
 
     // =====================================================================
@@ -234,27 +235,61 @@ public class EventService {
     // =====================================================================
     // Mapping
     // =====================================================================
-    public EventSummaryResponse toSummaryResponse(Event event, String authenticatedUserId) {
-        Optional<BigDecimal> minPrice = ticketTypeRepository.findMinPrecioByEventId(event.getId());
-        Integer disponibles = ticketTypeRepository.findTotalDisponiblesByEventId(event.getId());
+    private List<EventSummaryResponse> toSummaryResponsesBulk(List<Event> events, String authenticatedUserId) {
+        if (events.isEmpty()) return List.of();
 
-        List<ArtistResponse> artists = event.getEventArtists().stream()
-                .map(ea -> {
-                    Artist a = ea.getArtist();
-                    long followers = followingRepository.countByIdArtistId(a.getId());
-                    return ArtistResponse.builder()
-                            .id(a.getId())
-                            .nombre(a.getNombre())
-                            .genero(a.getGenero())
-                            .bio(a.getBio())
-                            .fotoUrl(a.getFotoUrl())
-                            .followersCount((int) followers)
-                            .isFollowing(null) // null in event listings
-                            .createdAt(a.getCreatedAt())
-                            .build();
-                })
+        List<UUID> eventIds = events.stream().map(Event::getId).collect(Collectors.toList());
+        List<EventAggregateProjection> aggregates = ticketTypeRepository.getAggregatesByEventIds(eventIds);
+        Map<UUID, BigDecimal> minPriceMap = aggregates.stream()
+                .filter(a -> a.getMinPrice() != null)
+                .collect(Collectors.toMap(EventAggregateProjection::getEventId, EventAggregateProjection::getMinPrice, (v1, v2) -> v1));
+        Map<UUID, Integer> disponiblesMap = aggregates.stream()
+                .collect(Collectors.toMap(EventAggregateProjection::getEventId, EventAggregateProjection::getTotalDisponibles, (v1, v2) -> v1));
+
+        List<UUID> artistIds = events.stream()
+                .flatMap(e -> e.getEventArtists().stream())
+                .map(ea -> ea.getArtist().getId())
+                .distinct()
                 .collect(Collectors.toList());
 
+        Map<UUID, Long> followersMap = Map.of();
+        if (!artistIds.isEmpty()) {
+            List<ArtistFollowersProjection> followers = followingRepository.getFollowersByArtistIds(artistIds);
+            followersMap = followers.stream()
+                    .collect(Collectors.toMap(ArtistFollowersProjection::getArtistId, ArtistFollowersProjection::getFollowers, (v1, v2) -> v1));
+        }
+
+        Map<UUID, Long> finalFollowersMap = followersMap;
+        return events.stream().map(event -> {
+            BigDecimal minPrice = minPriceMap.get(event.getId());
+            Integer disponibles = disponiblesMap.getOrDefault(event.getId(), 0);
+
+            List<ArtistResponse> artists = event.getEventArtists().stream()
+                    .map(ea -> buildArtistResponse(ea.getArtist(), finalFollowersMap.getOrDefault(ea.getArtist().getId(), 0L)))
+                    .collect(Collectors.toList());
+
+            return buildEventSummaryResponse(event, artists, minPrice, disponibles);
+        }).collect(Collectors.toList());
+    }
+
+    public EventSummaryResponse toSummaryResponse(Event event, String authenticatedUserId) {
+        return toSummaryResponsesBulk(List.of(event), authenticatedUserId).get(0);
+    }
+
+    private ArtistResponse buildArtistResponse(Artist a, long followers) {
+        return ArtistResponse.builder()
+                .id(a.getId())
+                .nombre(a.getNombre())
+                .genero(a.getGenero())
+                .bio(a.getBio())
+                .fotoUrl(a.getFotoUrl())
+                .followersCount((int) followers)
+                .isFollowing(null)
+                .createdAt(a.getCreatedAt())
+                .build();
+    }
+
+    private EventSummaryResponse buildEventSummaryResponse(Event event, List<ArtistResponse> artists, BigDecimal minPrice, Integer disponibles) {
         return EventSummaryResponse.builder()
                 .id(event.getId())
                 .nombre(event.getNombre())
@@ -265,7 +300,7 @@ public class EventService {
                 .estado(event.getEstado())
                 .organizer(OrganizerService.toResponse(event.getOrganizer()))
                 .artists(artists)
-                .precioDesde(minPrice.orElse(null))
+                .precioDesde(minPrice)
                 .boletosDisponibles(disponibles)
                 .build();
     }

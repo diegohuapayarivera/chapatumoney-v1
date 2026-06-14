@@ -1,7 +1,9 @@
 package com.dhr.chapatumoney.repository;
 
 import com.dhr.chapatumoney.entity.TicketType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,9 +18,17 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, UUID> {
 
     List<TicketType> findByEventId(UUID eventId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM TicketType t WHERE t.id = :id")
+    Optional<TicketType> findByIdWithLock(@Param("id") UUID id);
+
     @Query("SELECT MIN(t.precio) FROM TicketType t WHERE t.event.id = :eventId")
     Optional<BigDecimal> findMinPrecioByEventId(@Param("eventId") UUID eventId);
 
     @Query("SELECT COALESCE(SUM(t.capacidad - t.vendidos), 0) FROM TicketType t WHERE t.event.id = :eventId")
     Integer findTotalDisponiblesByEventId(@Param("eventId") UUID eventId);
+
+    @Query("SELECT t.event.id as eventId, MIN(t.precio) as minPrice, CAST(COALESCE(SUM(t.capacidad - t.vendidos), 0) AS integer) as totalDisponibles " +
+           "FROM TicketType t WHERE t.event.id IN :eventIds GROUP BY t.event.id")
+    List<EventAggregateProjection> getAggregatesByEventIds(@Param("eventIds") List<UUID> eventIds);
 }

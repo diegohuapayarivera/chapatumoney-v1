@@ -66,7 +66,7 @@ public class OrganizerController {
             id = organizerService.getOrganizerBySlug(idOrSlug).getId();
         }
 
-        EventStatus status = estado != null ? EventStatus.valueOf(estado) : null;
+        EventStatus status = estado != null ? EventStatus.valueOf(estado.toLowerCase()) : null;
         return ResponseEntity.ok(eventService.getEventsByOrganizer(id, status, timeFilter, page, size));
     }
 }

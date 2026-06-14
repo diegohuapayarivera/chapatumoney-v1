@@ -100,8 +100,15 @@ public class OrderService {
         // Change state
         order.setEstado(OrderStatus.confirmed);
 
-        // Increment vendidos
-        TicketType ticketType = order.getTicketType();
+        // Increment vendidos with pessimistic lock to prevent race conditions
+        TicketType ticketType = ticketTypeRepository.findByIdWithLock(order.getTicketType().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Tipo de boleto no encontrado"));
+
+        int disponibles = ticketType.getCapacidad() - ticketType.getVendidos();
+        if (disponibles < order.getCantidad()) {
+            throw new ConflictException("No hay suficientes boletos disponibles al momento de confirmar. Disponibles: " + disponibles);
+        }
+
         int initialVendidos = ticketType.getVendidos();
         ticketType.setVendidos(initialVendidos + order.getCantidad());
         ticketTypeRepository.save(ticketType);

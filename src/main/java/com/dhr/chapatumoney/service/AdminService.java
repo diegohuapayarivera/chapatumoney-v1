@@ -37,16 +37,17 @@ public class AdminService {
         
         Long ticketsSold = orderRepository.sumCantidadByEstado(OrderStatus.confirmed);
         BigDecimal totalRevenue = orderRepository.sumTotalByEstado(OrderStatus.confirmed);
+        BigDecimal revenue = totalRevenue != null ? totalRevenue : BigDecimal.ZERO;
         
         // 10% commission rule
-        BigDecimal platformCommission = totalRevenue.multiply(new BigDecimal("0.10"));
+        BigDecimal platformCommission = revenue.multiply(new BigDecimal("0.10"));
 
         return AdminStatsResponse.builder()
                 .totalUsers(totalUsers)
                 .totalOrganizers(totalOrganizers)
                 .totalEvents(totalEvents)
                 .totalTicketsSold(ticketsSold != null ? ticketsSold : 0L)
-                .totalRevenue(totalRevenue)
+                .totalRevenue(revenue)
                 .totalPlatformCommission(platformCommission)
                 .build();
     }
